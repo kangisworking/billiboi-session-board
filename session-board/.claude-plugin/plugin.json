@@ -1,10 +1,1 @@
-{
-  "name": "session-board",
-  "version": "0.1.0",
-  "description": "Shows every Claude Code session on this machine (status, current task, todo progress) in a band above the prompt or a side pane. Read-only.",
-  "types": "./types/index.d.ts",
-  "license": "MIT",
-  "author": {
-    "name": "kangisworking"
-  }
-}
+{ "name": "session-board", "version": "0.1.0", "description": "다른 Claude 세션들의 이름·상태·하는 일·todo 를 패널에 보여 준다(읽기 전용)", "types": "./types/index.d.ts" }

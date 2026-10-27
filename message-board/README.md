@@ -45,7 +45,7 @@
 | 명령 | 동작 |
 |---|---|
 | `/message-board` | 패널로 열기(기본). 전체화면이면 오른쪽, 아니면 프롬프트 위 inline |
-| `/message-board band` | 프롬프트 위 띠에 최근 5건만 |
+| `/message-board band` | 프롬프트 위 띠에 최근 5건만. 띠는 플러그인 하나만 그릴 수 있어 `session-board` 띠와 같이 켜면 둘 중 하나만 보입니다. 함께 쓰려면 `session-board` 의 최근 메시지 칸(`/session-board msgs on`)을 쓰세요 |
 | `/message-board off` | 숨기기 |
 | `/message-board from <이름>` | 보낸이에 그 글자가 들어간 것만 |
 | `/message-board to <이름>` | 받는이에 그 글자가 들어간 것만 |

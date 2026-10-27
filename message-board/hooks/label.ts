@@ -17,7 +17,7 @@ export function aliasOf(n: Names, sid: string, pid?: string): string | undefined
 // - 'me' → 나
 // - 'session:<sessionId>' → 별칭 또는 [앞 6자] 이름
 // - 'uds:/tmp/cc-socks/<pid>.sock' → 그 pid 의 세션
-// - ListAgents 가 보여 준 이름 통째('<cross-session-message from="uds:/tmp/cc-socks/584 [ed7ffa]'):
+// - ListAgents 가 보여 준 이름 통째('<cross-session-message from="uds:/tmp/cc-socks/11 [abc123]'):
 //   잘린 소켓 pid 앞자리가 한 세션에만 맞으면 그 세션, 아니면 '[ref]'
 export function labelOf(n: Names, address: string): string {
   if (address === 'me') return '나'

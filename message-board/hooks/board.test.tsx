@@ -120,8 +120,8 @@ test('a sent message, a received one and a typed prompt are recorded as files', 
   on('prompt.submit', (_, e) => ({ text: e.text }))
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  await $.session.send({ to: 'uds:/tmp/cc-socks/4242.sock', text: '리뷰 부탁', origin: { kind: 'model' } })
-  await $.session.receive({ origin: { kind: 'peer' }, text: '<cross-session-message from="uds:/tmp/cc-socks/4242.sock" from-name="x" from-mode="prompting">리뷰 끝</cross-session-message>' })
+  await $.session.send({ to: 'uds:/tmp/cc-socks/3333.sock', text: '리뷰 부탁', origin: { kind: 'model' } })
+  await $.session.receive({ origin: { kind: 'peer' }, text: '<cross-session-message from="uds:/tmp/cc-socks/3333.sock" from-name="x" from-mode="prompting">리뷰 끝</cross-session-message>' })
   await $.prompt.submit({ text: '알려 줘', origin: { kind: 'composer' }, wait: false })
   await $.prompt.submit({ text: '/message-board', origin: { kind: 'composer' }, wait: false })
   // record 는 기다리지 않는 뒷일이라 잠깐 둔다.
@@ -132,10 +132,10 @@ test('a sent message, a received one and a typed prompt are recorded as files', 
   for (const f of files) expect(f.path.startsWith('/home/x/.claude/peer-status/messages/')).toBe(true)
   const out = files.find(f => f.msg.dir === 'out')?.msg
   expect(out?.from).toBe('session:sess-abcdef-1')
-  expect(out?.to).toBe('uds:/tmp/cc-socks/4242.sock')
+  expect(out?.to).toBe('uds:/tmp/cc-socks/3333.sock')
   expect(out?.text).toBe('리뷰 부탁')
   const inn = files.find(f => f.msg.dir === 'in')?.msg
-  expect(inn?.from).toBe('uds:/tmp/cc-socks/4242.sock')
+  expect(inn?.from).toBe('uds:/tmp/cc-socks/3333.sock')
   expect(inn?.text).toBe('리뷰 끝')
   const user = files.find(f => f.msg.dir === 'user')?.msg
   expect(user?.from).toBe('me')
@@ -146,14 +146,14 @@ import { labelOf } from './label'
 
 test('labelOf resolves me, session ids, sockets, truncated ListAgents names and refs', async () => {
   const n = {
-    byPid: new Map([['58462', 'ad4ade1a-0000-0000-0000-000000000000'], ['50170', 'c55c8f00-0000-0000-0000-000000000000']]),
-    bySid: new Map([['ad4ade1a-0000-0000-0000-000000000000', '조율 창'], ['c55c8f00-0000-0000-0000-000000000000', '테스트 창']]),
-    aliases: { ad4ade: 'A · 조율', '50170': 'C · 테스트' },
+    byPid: new Map([['1111', 'aaaa1111-0000-0000-0000-000000000000'], ['2222', 'bbbb2222-0000-0000-0000-000000000000']]),
+    bySid: new Map([['aaaa1111-0000-0000-0000-000000000000', '조율 창'], ['bbbb2222-0000-0000-0000-000000000000', '테스트 창']]),
+    aliases: { aaaa11: 'A · 조율', '2222': 'C · 테스트' },
   }
   expect(labelOf(n, 'me')).toBe('나')
-  expect(labelOf(n, 'session:ad4ade1a-0000-0000-0000-000000000000')).toBe('A · 조율')
-  expect(labelOf(n, 'uds:/tmp/cc-socks/50170.sock')).toBe('C · 테스트')
-  expect(labelOf(n, '<cross-session-message from="uds:/tmp/cc-socks/584 [ed7ffa]')).toBe('A · 조율')
+  expect(labelOf(n, 'session:aaaa1111-0000-0000-0000-000000000000')).toBe('A · 조율')
+  expect(labelOf(n, 'uds:/tmp/cc-socks/2222.sock')).toBe('C · 테스트')
+  expect(labelOf(n, '<cross-session-message from="uds:/tmp/cc-socks/11 [abc123]')).toBe('A · 조율')
   expect(labelOf(n, 'some long name that nobody knows [ab12cd]')).toBe('[ab12cd]')
   expect(labelOf(n, 'session:ffffffff-1111-0000-0000-000000000000')).toBe('[ffffff]')
 })

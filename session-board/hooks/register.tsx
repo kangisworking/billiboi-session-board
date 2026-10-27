@@ -1,7 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
-import type { BoardMode, Row, Todo } from '../types'
+import type { BoardMode, RecentMsg, Row, Todo } from '../types'
+import { loadNames, readRecent } from './messages'
 import { fit, stringWidth } from './width'
 
 // 읽기 전용. ~/.claude 아래 파일만 읽어 그린다. 세션 대화(jsonl)는 읽지 않는다.
@@ -18,6 +19,11 @@ const rows = atom({ plugin: 'session-board', key: 'rows' } as const, [], { shape
 const mode = atom({ plugin: 'session-board', key: 'mode' } as const, 'band', { shape: 'mode-1' })
 const frame = atom({ plugin: 'session-board', key: 'frame' } as const, 0, { shape: 'frame-1' })
 const showAll = atom({ plugin: 'session-board', key: 'showAll' } as const, false, { shape: 'showAll-1' })
+// 최근 메시지 칸: message-board 가 남긴 파일을 읽어 띠·패널 맨 위에 몇 건 보인다. /session-board msgs on|off
+const msgsOn = atom({ plugin: 'session-board', key: 'msgsOn' } as const, true, { shape: 'msgsOn-1' })
+const recent = atom({ plugin: 'session-board', key: 'recent' } as const, [], { shape: 'recent-1' })
+const RECENT_N = 4
+const MSG_PALETTE = ['claude', 'success', 'warning', 'suggestion', 'remember', 'planMode', 'autoAccept', 'ide', 'merged', 'permission']
 
 type Json = Record<string, unknown>
 type Session = { file: string; pid: number; sessionId: string; name: string; status: string; kind: string; updatedAt: number; jobId?: string }
@@ -164,6 +170,12 @@ async function refresh($: any) {
   try {
     const next = await collect($)
     await update($, rows, () => next)
+    if (await read($, msgsOn)) {
+      const { stdout } = await $.process.run(['sh', '-c', 'printf %s "$HOME"'], { timeoutMs: 5000 })
+      const base = `${String(stdout).trim()}/.claude`
+      const list: RecentMsg[] = await readRecent($, base, await loadNames($, base), RECENT_N)
+      await update($, recent, () => list)
+    }
   } catch (error) {
     $.ui.log(`session-board: ${String(error).slice(0, 120)}`, { to: 'debug' })
   }
@@ -258,6 +270,38 @@ function drawRows($: any, e: any, list: Row[], width: number, spin: string, todo
   return { Box, Text, line, header, body }
 }
 
+const hashOf = (s: string) => {
+  let h = 5381
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0
+  return h
+}
+const msgColor = (label: string) => (label === '나' ? 'text' : MSG_PALETTE[hashOf(label) % MSG_PALETTE.length])
+const hhmm = (ts: number) => {
+  const d = new Date(ts)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getHours())}:${p(d.getMinutes())}`
+}
+// 최근 메시지 칸: "HH:MM ●보낸이 → ●받는이  본문 한 줄". 없으면 빈 배열.
+function drawRecent($: any, e: any, list: RecentMsg[], width: number) {
+  const { Box, Text } = $.ui.resolve(e)
+  if (list.length === 0) return []
+  const items = list.map(m => {
+    const head = `${hhmm(m.ts)} ● ${m.from} → ● ${m.to}${m.isUser ? ' (입력)' : ''} `
+    const rest = Math.max(8, width - stringWidth(head))
+    return (
+      <Box>
+        <Text dimColor wrap="truncate">{hhmm(m.ts)} </Text>
+        <Text color={msgColor(m.from)} wrap="truncate">● {m.from}</Text>
+        <Text dimColor wrap="truncate"> → </Text>
+        <Text color={msgColor(m.to)} wrap="truncate">● {m.to}</Text>
+        {m.isUser ? <Text dimColor wrap="truncate"> (입력)</Text> : null}
+        <Text wrap="truncate"> {fit(m.text, rest)}</Text>
+      </Box>
+    )
+  })
+  return [<Text dimColor wrap="truncate">{fit(`최근 메시지 ${list.length}건 (/message-board 로 전체, /session-board msgs off 로 숨김)`, width)}</Text>, ...items, <Text dimColor wrap="truncate">{'─'.repeat(width)}</Text>]
+}
+
 async function setMode($: any, next: BoardMode) {
   await update($, mode, () => next)
   if (next === 'pane') {
@@ -272,7 +316,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'session-board',
-      description: '세션 현황: /session-board (프롬프트 위 띠), right (오른쪽 패널), all (숨긴 세션까지), off (숨김)',
+      description: '세션 현황: /session-board (프롬프트 위 띠), right (오른쪽 패널), all (숨긴 세션까지), msgs on|off (최근 메시지 칸), off (숨김)',
     })
     // 기본은 띠(band). 전에 패널 모드로 두었으면 그대로 다시 연다.
     const kept = await read($, mode)
@@ -295,7 +339,8 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'session-board' }, async ($, e) => {
-    const arg = e.args.trim().toLowerCase()
+    const rest0 = (a: string) => a.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
+    const arg = rest0(e.args)
     if (arg === 'right' || arg === 'pane' || arg === 'dock') {
       await setMode($, 'pane')
       return { text: '세션 현황을 패널(전체화면이면 오른쪽)로 엽니다. /session-board 로 프롬프트 위 띠로 돌아갑니다.' }
@@ -303,6 +348,13 @@ export const register: Register = on => {
     if (arg === 'off' || arg === 'hide' || arg === 'close') {
       await setMode($, 'off')
       return { text: '세션 현황을 숨겼습니다. /session-board 로 다시 켭니다.' }
+    }
+    if (arg === 'msgs' || rest0(e.args) === 'msgs') {
+      const want = /\boff\b/.test(e.args) ? false : /\bon\b/.test(e.args) ? true : !(await read($, msgsOn))
+      await update($, msgsOn, () => want)
+      if (!want) await update($, recent, () => [])
+      await refresh($)
+      return { text: want ? '띠·패널 맨 위에 최근 메시지를 보입니다.' : '최근 메시지 칸을 숨깁니다. /session-board msgs on 으로 다시 켭니다.' }
     }
     if (arg === 'all') {
       const now = !(await read($, showAll))
@@ -327,9 +379,11 @@ export const register: Register = on => {
       const t = nextTodo(row)
       return t ? [t] : []
     })
+    const top = (await read($, msgsOn)) ? drawRecent($, e, await read($, recent), width) : []
 
     return (
       <Box flexDirection="column">
+        {top}
         <Text dimColor wrap="truncate">{fit(summary(all) + (hidden > 0 ? ` · +${hidden}개 숨김(/session-board all)` : ''), width)}</Text>
         <Text dimColor wrap="truncate">{line}</Text>
         {header}
@@ -346,9 +400,11 @@ export const register: Register = on => {
     const hidden = all.length - list.length
     const width = Math.max(40, (e.props?.bodyColumns ?? 60) - 1)
     const { Box, Text, line, header, body } = drawRows($, e, list, width, spin, row => row.todos)
+    const top = (await read($, msgsOn)) ? drawRecent($, e, await read($, recent), width) : []
 
     return (
       <Box flexDirection="column">
+        {top}
         {all.length === 0 && <Text dimColor>살아 있는 세션이 없거나 아직 읽는 중입니다.</Text>}
         {all.length > 0 && <Text dimColor wrap="truncate">{fit(summary(all), width)}</Text>}
         {all.length > 0 && <Text dimColor wrap="truncate">{line}</Text>}
