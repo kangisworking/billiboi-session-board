@@ -1,0 +1,8 @@
+{
+  "name": "billiboi-session-board",
+  "owner": { "name": "kangisworking" },
+  "plugins": [
+    { "name": "session-board", "source": "./session-board", "description": "Shows every Claude Code session on this machine (status, current task, todo progress) in a band above the prompt or a side pane. Read-only." },
+    { "name": "peer-status-writer", "source": "./peer-status-writer", "description": "Writes this session's TodoWrite/TaskCreate/TaskUpdate items to ~/.claude/peer-status/<sessionId>.json so session-board can show them." }
+  ]
+}

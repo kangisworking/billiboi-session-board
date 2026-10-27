@@ -1,0 +1,10 @@
+{
+  "name": "session-board",
+  "version": "0.1.0",
+  "description": "Shows every Claude Code session on this machine (status, current task, todo progress) in a band above the prompt or a side pane. Read-only.",
+  "types": "./types/index.d.ts",
+  "license": "MIT",
+  "author": {
+    "name": "kangisworking"
+  }
+}

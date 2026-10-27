@@ -1,0 +1,10 @@
+{
+  "name": "peer-status-writer",
+  "version": "0.1.0",
+  "description": "Writes this session's TodoWrite/TaskCreate/TaskUpdate items to ~/.claude/peer-status/<sessionId>.json so session-board can show them.",
+  "types": "./types/index.d.ts",
+  "license": "MIT",
+  "author": {
+    "name": "kangisworking"
+  }
+}
