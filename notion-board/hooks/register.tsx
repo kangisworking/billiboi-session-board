@@ -4,12 +4,14 @@ import type { Register } from 'claude-code'
 import type { BoardMode, Change, Filter, Issue, Sync } from '../types'
 import {
   applyFilter, countByStatus, describeFilter, diff, isOverdue, mergeChanges, readConfig, sortIssues, statusMap, themeOf, toIssue, todayKst,
+  tokenOrder, TOKEN_ENVS,
 } from './notion'
 import type { Config } from './notion'
 import { fit } from './width'
 
 // 읽기 전용. 노션 공식 API 의 조회(query)만 부른다. 쓰기 요청은 보내지 않는다.
-// 설정: ~/.claude/notion-board.json, 토큰: 환경변수 NOTION_API_KEY(없으면 NOTION_TOKEN). 토큰 값은 화면·로그·저장소 어디에도 남기지 않는다.
+// 설정: ~/.claude/notion-board.json, 토큰: 설정의 tokenEnv(기본 NOTION_BOARD_TOKEN) → NOTION_API_KEY → NOTION_TOKEN 순.
+// 토큰 값은 화면·로그·저장소 어디에도 남기지 않는다.
 const PANE = 'notion-board'
 const TICK_MS = 30_000
 const API = 'https://api.notion.com/v1'
@@ -38,25 +40,39 @@ async function loadConfig($: any): Promise<{ cfg?: Config; error: string }> {
   }
 }
 
-async function token($: any): Promise<string> {
-  return (await $.env.get('NOTION_API_KEY')) || (await $.env.get('NOTION_TOKEN')) || ''
+// $.env.get 은 이름이 글자 그대로여야 해서 이름마다 따로 부른다.
+async function readEnv($: any, name: string): Promise<string> {
+  if (name === 'NOTION_BOARD_TOKEN') return (await $.env.get('NOTION_BOARD_TOKEN')) ?? ''
+  if (name === 'NOTION_API_KEY') return (await $.env.get('NOTION_API_KEY')) ?? ''
+  if (name === 'NOTION_TOKEN') return (await $.env.get('NOTION_TOKEN')) ?? ''
+  return ''
 }
 
+async function token($: any, cfg: Config): Promise<{ key: string; name: string }> {
+  for (const name of tokenOrder(cfg.tokenEnv)) {
+    const key = await readEnv($, name)
+    if (key) return { key, name }
+  }
+  return { key: '', name: '' }
+}
+
+const TOKEN_TODO = '노션 이슈 DB 가 있는 워크스페이스에서 통합을 만들고, 그 토큰을 NOTION_BOARD_TOKEN 에 넣은 뒤 이슈 DB 를 그 통합에 공유하세요'
+
 // 실패 사유를 사람이 할 일로 바꾼다. 응답 본문의 message 는 토큰을 담지 않지만 길이를 자른다.
-function reason(status: number, text: string): string {
+function reason(status: number, text: string, tokenName: string): string {
   let message = ''
   try {
     message = String(JSON.parse(text).message ?? '')
   } catch {
     message = ''
   }
-  if (status === 401) return '토큰이 거부되었습니다(NOTION_API_KEY 확인)'
-  if (status === 404) return '이 DB 가 통합에 공유되지 않았습니다. 노션 DB 페이지 ⋯ > 연결 > 통합 추가'
+  if (status === 401) return `${tokenName} 토큰이 거부되었습니다. ${TOKEN_TODO}`
+  if (status === 404) return `${tokenName} 의 통합이 이 DB 를 볼 수 없습니다. ${TOKEN_TODO}(DB 페이지 ⋯ > 연결)`
   if (status === 429) return '노션 요청 한도에 걸렸습니다. 다음 주기에 다시 시도합니다'
   return `노션 응답 ${status}${message ? `: ${message.slice(0, 100)}` : ''}`
 }
 
-async function fetchAll($: any, cfg: Config, key: string): Promise<Issue[]> {
+async function fetchAll($: any, cfg: Config, key: string, tokenName: string): Promise<Issue[]> {
   const out: Issue[] = []
   let cursor: string | undefined
   for (let page = 0; page < cfg.maxPages; page++) {
@@ -67,7 +83,7 @@ async function fetchAll($: any, cfg: Config, key: string): Promise<Issue[]> {
       headers: { Authorization: `Bearer ${key}`, 'Notion-Version': cfg.notionVersion, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    if (!res.ok) throw new Error(reason(res.status, res.text))
+    if (!res.ok) throw new Error(reason(res.status, res.text, tokenName))
     const data = JSON.parse(res.text)
     for (const result of Array.isArray(data.results) ? data.results : []) {
       const issue = toIssue(result, cfg.props)
@@ -94,14 +110,18 @@ async function refresh($: any, force = false) {
       await update($, sync, () => ({ ...base, error: loaded.error }))
       return
     }
-    const key = await token($)
+    if (!(TOKEN_ENVS as readonly string[]).includes(cfg.tokenEnv)) {
+      await update($, sync, () => ({ ...base, error: `tokenEnv 는 ${TOKEN_ENVS.join(', ')} 중 하나여야 합니다` }))
+      return
+    }
+    const { key, name } = await token($, cfg)
     if (!key) {
-      await update($, sync, () => ({ ...base, error: '환경변수 NOTION_API_KEY 가 없습니다' }))
+      await update($, sync, () => ({ ...base, error: `토큰이 없습니다. ${TOKEN_TODO}` }))
       return
     }
     let list: Issue[]
     try {
-      list = await fetchAll($, cfg, key)
+      list = await fetchAll($, cfg, key, name)
     } catch (error) {
       await update($, sync, () => ({ ...base, error: String((error as Error)?.message ?? error).slice(0, 160) }))
       return

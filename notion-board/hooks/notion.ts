@@ -4,6 +4,7 @@ import type { Change, Filter, Issue } from '../types'
 export type Props = { id: string; title: string; status: string; customer: string; priority: string; owner: string; due: string; flag: string }
 export type Config = {
   dataSourceId: string
+  tokenEnv: string // 토큰을 담은 환경변수 이름. TOKEN_ENVS 중 하나
   title: string
   notionVersion: string
   intervalSec: number
@@ -21,6 +22,13 @@ const obj = (v: unknown): Json => (v && typeof v === 'object' && !Array.isArray(
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
 const strs = (v: unknown): string[] => arr(v).filter((x): x is string => typeof x === 'string')
 
+// 모드 API 는 환경변수 이름을 소스에 글자 그대로 적어야 읽을 수 있어, 고를 수 있는 이름을 정해 둔다.
+export const TOKEN_ENVS = ['NOTION_BOARD_TOKEN', 'NOTION_API_KEY', 'NOTION_TOKEN'] as const
+export const DEFAULT_TOKEN_ENV = 'NOTION_BOARD_TOKEN'
+
+// 먼저 읽을 이름(설정의 tokenEnv)을 앞에 두고 나머지를 정해진 순서로 잇는다.
+export const tokenOrder = (first: string): string[] => [first, ...TOKEN_ENVS.filter(n => n !== first)]
+
 // 열 이름 기본값은 비워 둔다. 제목·상태·번호·수정 시각은 칸의 종류로 찾고, 나머지는 설정에서 이름을 준다.
 const EMPTY_PROPS: Props = { id: '', title: '', status: '', customer: '', priority: '', owner: '', due: '', flag: '' }
 
@@ -33,6 +41,7 @@ export function readConfig(raw: unknown): Config | undefined {
   const filter = obj(o.defaultFilter)
   return {
     dataSourceId,
+    tokenEnv: str(o.tokenEnv, DEFAULT_TOKEN_ENV).trim() || DEFAULT_TOKEN_ENV,
     title: str(o.title, '노션 이슈'),
     notionVersion: str(o.notionVersion, '2025-09-03'),
     intervalSec: Math.max(60, Number(o.intervalSec) || 180),

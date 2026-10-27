@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { applyFilter, countByStatus, diff, isOverdue, mergeChanges, readConfig, sortIssues, statusMap, toIssue } from './notion'
+import { applyFilter, countByStatus, diff, isOverdue, mergeChanges, readConfig, sortIssues, statusMap, toIssue, tokenOrder } from './notion'
 import { stringWidth } from './width'
 
 // 가짜 데이터만 쓴다(실제 이슈·사람 이름 없음).
@@ -33,6 +33,10 @@ const page = (n: number, status: string, color: string, extra: Record<string, un
 test('config: 경로 접두어를 떼고 기본값을 채운다, dataSourceId 없으면 undefined', async () => {
   expect(CFG.dataSourceId).toBe('00000000-0000-0000-0000-000000000000')
   expect(CFG.intervalSec).toBe(180)
+  expect(CFG.tokenEnv).toBe('NOTION_BOARD_TOKEN')
+  expect(tokenOrder(CFG.tokenEnv)).toEqual(['NOTION_BOARD_TOKEN', 'NOTION_API_KEY', 'NOTION_TOKEN'])
+  expect(tokenOrder('NOTION_TOKEN')).toEqual(['NOTION_TOKEN', 'NOTION_BOARD_TOKEN', 'NOTION_API_KEY'])
+  expect(readConfig({ dataSourceId: 'x', tokenEnv: 'NOTION_API_KEY' })!.tokenEnv).toBe('NOTION_API_KEY')
   expect(readConfig({})).toBe(undefined)
   expect(readConfig({ dataSourceId: 'x', intervalSec: 5 })!.intervalSec).toBe(60)
 })

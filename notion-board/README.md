@@ -48,15 +48,19 @@
 
 ## 설정
 
-1. **노션 통합(integration) 토큰**을 만들고 환경변수 `NOTION_API_KEY`(또는 `NOTION_TOKEN`)에 둡니다.
-   `~/.claude/settings.json`의 `env`에 넣으면 됩니다. 토큰 값은 화면·로그·저장소 어디에도 남지 않습니다.
+1. **이 보드 전용 노션 통합(integration)**을 이슈 DB가 있는 워크스페이스에서 만들고(읽기 권한만), 그 토큰을 환경변수 `NOTION_BOARD_TOKEN`에 둡니다.
+   `~/.claude/settings.json`의 `env`에 넣으면 됩니다. 다른 용도로 쓰는 `NOTION_API_KEY`는 그대로 둬도 됩니다.
+   토큰은 설정의 `tokenEnv`(기본 `NOTION_BOARD_TOKEN`) → `NOTION_API_KEY` → `NOTION_TOKEN` 순으로 찾습니다.
+   `tokenEnv`는 이 셋 중 하나만 고를 수 있습니다(모드는 환경변수 이름을 코드에 글자 그대로 적어야 읽을 수 있습니다).
+   토큰 값은 화면·로그·저장소 어디에도 남지 않습니다.
 2. **DB를 그 통합에 공유**합니다. 노션에서 DB 페이지 오른쪽 위 `⋯` > `연결` > 통합 추가.
-   공유하지 않으면 표에 「이 DB 가 통합에 공유되지 않았습니다」가 뜹니다.
+   토큰이 없거나, 거부되거나, 그 통합이 DB를 볼 수 없으면 표 위에 빨간 줄로 할 일을 알려 줍니다.
 3. `~/.claude/notion-board.json`을 만듭니다(아래는 예시).
 
 ```json
 {
   "dataSourceId": "<collection:// 뒤의 id 또는 data source id>",
+  "tokenEnv": "NOTION_BOARD_TOKEN",
   "title": "이슈 DB",
   "intervalSec": 180,
   "me": { "userId": "<내 노션 user id>", "name": "<노션에 보이는 내 이름>" },
