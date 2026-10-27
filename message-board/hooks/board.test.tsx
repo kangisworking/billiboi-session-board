@@ -141,3 +141,61 @@ test('a sent message, a received one and a typed prompt are recorded as files', 
   expect(user?.from).toBe('me')
   expect(user?.text).toBe('알려 줘')
 })
+
+import { labelOf } from './label'
+
+test('labelOf resolves me, session ids, sockets, truncated ListAgents names and refs', async () => {
+  const n = {
+    byPid: new Map([['58462', 'ad4ade1a-0000-0000-0000-000000000000'], ['50170', 'c55c8f00-0000-0000-0000-000000000000']]),
+    bySid: new Map([['ad4ade1a-0000-0000-0000-000000000000', '조율 창'], ['c55c8f00-0000-0000-0000-000000000000', '테스트 창']]),
+    aliases: { ad4ade: 'A · 조율', '50170': 'C · 테스트' },
+  }
+  expect(labelOf(n, 'me')).toBe('나')
+  expect(labelOf(n, 'session:ad4ade1a-0000-0000-0000-000000000000')).toBe('A · 조율')
+  expect(labelOf(n, 'uds:/tmp/cc-socks/50170.sock')).toBe('C · 테스트')
+  expect(labelOf(n, '<cross-session-message from="uds:/tmp/cc-socks/584 [ed7ffa]')).toBe('A · 조율')
+  expect(labelOf(n, 'some long name that nobody knows [ab12cd]')).toBe('[ab12cd]')
+  expect(labelOf(n, 'session:ffffffff-1111-0000-0000-000000000000')).toBe('[ffffff]')
+})
+
+test('collect reads date folders that fs.list reports as dir', async ($, on) => {
+  const day = '2026-01-02'
+  const file = { id: '1-aaaaaa-out', ts: new Date('2026-01-02T10:00:00').getTime(), dir: 'out', from: 'session:aaaaaa-1', to: 'uds:/tmp/cc-socks/77.sock', text: '안녕' }
+  const stored: Record<string, unknown> = {}
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.id', () => ({ value: 'zzzzzz-9' }))
+  on('command.register', (_, e) => ({ value: { command: e.name } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('process.run', () => ({ value: { exitCode: 0, stdout: '/home/x', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  on('fs.list', (_, e) => {
+    if (e.path.endsWith('/peer-status/messages')) return { value: [{ name: day, kind: 'dir', size: 0, mtimeMs: 0, isLink: false }] }
+    if (e.path.endsWith(`/messages/${day}`)) return { value: [{ name: `${file.id}.json`, kind: 'file', size: 1, mtimeMs: 0, isLink: false }] }
+    if (e.path.endsWith('/sessions')) return { value: [{ name: '77.json', kind: 'file', size: 1, mtimeMs: 0, isLink: false }] }
+    return { value: [] }
+  })
+  on('fs.read', (_, e) => {
+    if (e.path.endsWith(`${file.id}.json`)) return { value: JSON.stringify(file) }
+    if (e.path.endsWith('/sessions/77.json')) return { value: JSON.stringify({ pid: 77, sessionId: 'bbbbbb-2', name: '리뷰 창' }) }
+    if (e.path.endsWith('/aliases.json')) return { value: JSON.stringify({ aaaaaa: 'A · 조율', bbbbbb: 'B · 리뷰어' }) }
+    throw new Error('missing')
+  })
+  on('state.get', (_, e) => {
+    const key = (e as { key: string }).key
+    const shapes: Record<string, string> = { msgs: 'msgs-1', filter: 'filter-1', expanded: 'expanded-1', mode: 'mode-1' }
+    const fallback: Record<string, unknown> = { msgs: [], filter: { kind: 'all' }, expanded: false, mode: 'pane' }
+    return { value: { value: { shape: shapes[key], value: key in stored ? stored[key] : fallback[key] }, version: 1 } }
+  })
+  on('state.set', (_, e) => {
+    stored[(e as { key: string }).key] = (e as { value: { value: unknown } }).value?.value ?? (e as { value: unknown }).value
+    return { value: { isSet: true, version: 2 } }
+  })
+
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await new Promise<void>(resolve => { const t = Date.now(); const spin = () => (Date.now() - t > 150 ? resolve() : void Promise.resolve().then(spin)); spin() })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect((await ui.find({ type: 'Text', text: /A · 조율/ }))?.text).toContain('A · 조율')
+  expect((await ui.find({ type: 'Text', text: /B · 리뷰어/ }))?.text).toContain('B · 리뷰어')
+  expect((await ui.find({ type: 'Text', text: /안녕/ }))?.text).toContain('안녕')
+  await ui.unmount()
+})

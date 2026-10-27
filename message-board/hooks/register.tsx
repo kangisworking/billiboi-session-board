@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
 import type { BoardMode, Filter, Msg } from '../types'
+import { labelOf, type Names } from './label'
 import { fit, stringWidth } from './width'
 
 // 두 가지 일을 한다.
@@ -87,7 +88,7 @@ function unwrap(text: string): { from?: string; body: string } {
 async function cleanup($: any, base: string) {
   const limit = Date.now() - KEEP_DAYS * 86400_000
   for (const entry of await listDir($, `${base}/peer-status/messages`)) {
-    if (entry.kind !== 'directory' || !/^\d{4}-\d{2}-\d{2}$/.test(entry.name)) continue
+    if (entry.kind !== 'dir' || !/^\d{4}-\d{2}-\d{2}$/.test(entry.name)) continue
     if (new Date(entry.name + 'T00:00:00').getTime() >= limit) continue
     try {
       await $.process.run(['rm', '-rf', '--', `${base}/peer-status/messages/${entry.name}`], { timeoutMs: 5000 })
@@ -97,8 +98,7 @@ async function cleanup($: any, base: string) {
   }
 }
 
-// ---- 읽기·이름 풀기 ----
-type Names = { byPid: Map<string, string>; bySid: Map<string, string>; aliases: Record<string, string> }
+// ---- 읽기 ----
 async function names($: any, base: string): Promise<Names> {
   const byPid = new Map<string, string>()
   const bySid = new Map<string, string>()
@@ -116,28 +116,6 @@ async function names($: any, base: string): Promise<Names> {
   for (const [k, v] of Object.entries(raw)) if (typeof v === 'string' && v) aliases[k] = v
   return { byPid, bySid, aliases }
 }
-const aliasOf = (n: Names, sid: string, pid?: string): string | undefined => {
-  for (const [key, value] of Object.entries(n.aliases)) {
-    if (pid !== undefined && key === pid) return value
-    if (key.length >= 4 && sid.toLowerCase().startsWith(key.toLowerCase())) return value
-  }
-  return undefined
-}
-// 주소를 사람이 읽는 이름으로. 'me' → 나, session:<sid> → 별칭, uds:/.../<pid>.sock → 그 pid 의 세션 별칭
-function labelOf(n: Names, address: string): string {
-  if (address === 'me') return '나'
-  let sid = ''
-  let pid: string | undefined
-  if (address.startsWith('session:')) sid = address.slice(8)
-  const sock = /(\d+)\.sock$/.exec(address)
-  if (sock) {
-    pid = sock[1]
-    sid = n.byPid.get(pid ?? '') ?? ''
-  }
-  if (sid) return aliasOf(n, sid, pid) ?? `[${sid.slice(0, 6)}] ${n.bySid.get(sid) ?? ''}`.trim()
-  if (pid) return `pid ${pid}`
-  return address
-}
 const colorOf = (label: string) => (label === '나' ? 'text' : PALETTE[hash(label) % PALETTE.length])
 
 async function collect($: any): Promise<Msg[]> {
@@ -145,7 +123,7 @@ async function collect($: any): Promise<Msg[]> {
   const n = await names($, base)
   const out: Msg[] = []
   const days = (await listDir($, `${base}/peer-status/messages`))
-    .filter(e => e.kind === 'directory' && /^\d{4}-\d{2}-\d{2}$/.test(e.name))
+    .filter(e => e.kind === 'dir' && /^\d{4}-\d{2}-\d{2}$/.test(e.name))
     .map(e => e.name)
     .sort()
     .slice(-KEEP_DAYS)
