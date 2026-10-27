@@ -22,7 +22,9 @@ const showAll = atom({ plugin: 'session-board', key: 'showAll' } as const, false
 // 최근 메시지 칸: message-board 가 남긴 파일을 읽어 띠·패널 맨 위에 몇 건 보인다. /session-board msgs on|off
 const msgsOn = atom({ plugin: 'session-board', key: 'msgsOn' } as const, true, { shape: 'msgsOn-1' })
 const recent = atom({ plugin: 'session-board', key: 'recent' } as const, [], { shape: 'recent-1' })
-const RECENT_N = 4
+const RECENT_DEFAULT = 10
+const RECENT_MAX = 30
+const msgsN = atom({ plugin: 'session-board', key: 'msgsN' } as const, RECENT_DEFAULT, { shape: 'msgsN-1' })
 const MSG_PALETTE = ['claude', 'success', 'warning', 'suggestion', 'remember', 'planMode', 'autoAccept', 'ide', 'merged', 'permission']
 
 type Json = Record<string, unknown>
@@ -173,7 +175,8 @@ async function refresh($: any) {
     if (await read($, msgsOn)) {
       const { stdout } = await $.process.run(['sh', '-c', 'printf %s "$HOME"'], { timeoutMs: 5000 })
       const base = `${String(stdout).trim()}/.claude`
-      const list: RecentMsg[] = await readRecent($, base, await loadNames($, base), RECENT_N)
+      const n = Math.min(RECENT_MAX, Math.max(1, (await read($, msgsN)) || RECENT_DEFAULT))
+      const list: RecentMsg[] = await readRecent($, base, await loadNames($, base), n)
       await update($, recent, () => list)
     }
   } catch (error) {
@@ -299,7 +302,7 @@ function drawRecent($: any, e: any, list: RecentMsg[], width: number) {
       </Box>
     )
   })
-  return [<Text dimColor wrap="truncate">{fit(`최근 메시지 ${list.length}건 (/message-board 로 전체, /session-board msgs off 로 숨김)`, width)}</Text>, ...items, <Text dimColor wrap="truncate">{'─'.repeat(width)}</Text>]
+  return [<Text dimColor wrap="truncate">{fit(`최근 메시지 ${list.length}건 (/message-board 로 전체, /session-board msgs <n>|off)`, width)}</Text>, ...items, <Text dimColor wrap="truncate">{'─'.repeat(width)}</Text>]
 }
 
 async function setMode($: any, next: BoardMode) {
@@ -316,7 +319,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'session-board',
-      description: '세션 현황: /session-board (프롬프트 위 띠), right (오른쪽 패널), all (숨긴 세션까지), msgs on|off (최근 메시지 칸), off (숨김)',
+      description: '세션 현황: /session-board (프롬프트 위 띠), right (오른쪽 패널), all (숨긴 세션까지), msgs on|off|<n> (최근 메시지 칸, 기본 10건), off (숨김)',
     })
     // 기본은 띠(band). 전에 패널 모드로 두었으면 그대로 다시 연다.
     const kept = await read($, mode)
@@ -350,6 +353,14 @@ export const register: Register = on => {
       return { text: '세션 현황을 숨겼습니다. /session-board 로 다시 켭니다.' }
     }
     if (arg === 'msgs' || rest0(e.args) === 'msgs') {
+      const count = /\b(\d{1,2})\b/.exec(e.args)?.[1]
+      if (count !== undefined) {
+        const n = Math.min(RECENT_MAX, Math.max(1, Number(count)))
+        await update($, msgsN, () => n)
+        await update($, msgsOn, () => true)
+        await refresh($)
+        return { text: `최근 메시지를 ${n}건까지 보입니다(1~${RECENT_MAX}).` }
+      }
       const want = /\boff\b/.test(e.args) ? false : /\bon\b/.test(e.args) ? true : !(await read($, msgsOn))
       await update($, msgsOn, () => want)
       if (!want) await update($, recent, () => [])
@@ -379,7 +390,13 @@ export const register: Register = on => {
       const t = nextTodo(row)
       return t ? [t] : []
     })
-    const top = (await read($, msgsOn)) ? drawRecent($, e, await read($, recent), width) : []
+    // 띠 높이(maxRows)가 모자라면 메시지 칸부터 줄인다: 머리줄 > 세션 표 > 메시지.
+    // 세션 표 = 구분선 1 + 열 제목 1 + 세션마다 1 + 진행 중 todo 줄. 메시지 칸 = 제목 1 + 건수 + 구분선 1.
+    const tableRows = 2 + list.reduce((n, row) => n + 1 + (nextTodo(row) ? 1 : 0), 0)
+    const room = (e.props.maxRows ?? 20) - 1 - tableRows - 2
+    const wanted = (await read($, msgsOn)) ? await read($, recent) : []
+    const shown = room >= 1 ? wanted.slice(-Math.min(wanted.length, room)) : []
+    const top = drawRecent($, e, shown, width)
 
     return (
       <Box flexDirection="column">

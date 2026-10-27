@@ -8,5 +8,5 @@
 /plugin install session-board --marketplace kangisworking/billiboi-session-board
 ```
 
-- `/session-board` 띠 · `/session-board right` 패널 · `/session-board all` 숨긴 세션 토글 · `/session-board msgs on|off` 최근 메시지 칸 · `/session-board off` 숨김
+- `/session-board` 띠 · `/session-board right` 패널 · `/session-board all` 숨긴 세션 토글 · `/session-board msgs on|off|<n>` 최근 메시지 칸(기본 10건) · `/session-board off` 숨김
 - 읽는 곳: `~/.claude/sessions`, `~/.claude/jobs`, `~/.claude/tasks`, `~/.claude/peer-status`

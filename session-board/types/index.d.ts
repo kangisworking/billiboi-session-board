@@ -23,6 +23,7 @@ declare module 'claude-code' {
       frame: Shaped<number> // 스피너 프레임 번호
       showAll: Shaped<boolean> // 오래 멈춘 이름 없는 세션까지 보이기
       msgsOn: Shaped<boolean> // 최근 메시지 칸 켜기
+      msgsN: Shaped<number> // 최근 메시지 건수(1~30, 기본 10)
       recent: Shaped<RecentMsg[]>
     }
   }
