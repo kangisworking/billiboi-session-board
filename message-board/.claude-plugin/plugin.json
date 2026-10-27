@@ -1,0 +1,8 @@
+{
+  "name": "message-board",
+  "version": "0.1.0",
+  "description": "Logs this session's cross-session messages (sent, received, and the user's own prompts) to ~/.claude/peer-status/messages/<date>/ and shows every session's messages as a timeline in a pane or above the prompt.",
+  "types": "./types/index.d.ts",
+  "license": "MIT",
+  "author": { "name": "kangisworking" }
+}

@@ -1,6 +1,8 @@
 # billiboi-session-board
 
-> **English summary.** Two small Claude Code *mods* (hook plugins). `session-board` shows every Claude Code session running on this machine, with its status, what it is doing and its todo progress, as a fixed-width table in the band above the prompt (default) or in a side pane. `peer-status-writer` makes a session publish its own todo list so the board can show it. Both are read/display only: they read JSON files under `~/.claude`, never a conversation transcript. Requires Claude Code 2.1.287 or later (the mods API). Install: `/plugin install session-board --marketplace kangisworking/billiboi-session-board`. MIT.
+세 모드: [session-board](session-board/README.md) (세션 현황판) · [peer-status-writer](peer-status-writer/README.md) (내 todo 올리기) · [message-board](message-board/README.md) (세션 간 메시지 타임라인) · [notion-board](notion-board/README.md) (노션 DB 현황표)
+
+> **English summary.** Four small Claude Code *mods* (hook plugins). `session-board` shows every Claude Code session running on this machine, with its status, what it is doing and its todo progress, as a fixed-width table in the band above the prompt (default) or in a side pane. `peer-status-writer` makes a session publish its own todo list so the board can show it. `message-board` logs each session's cross-session messages (and the user's own prompts) and shows them all as one timeline. `notion-board` shows a Notion database (an issue tracker, say) as a table above the prompt, refreshed periodically, read-only. Both are read/display only: they read JSON files under `~/.claude`, never a conversation transcript. Requires Claude Code 2.1.287 or later (the mods API). Install: `/plugin install session-board --marketplace kangisworking/billiboi-session-board`. MIT.
 
 한 PC에서 Claude Code 세션을 여러 개 띄워 두고 일할 때, 다른 세션들이 지금 무엇을 하고 있는지 한눈에 보려고 만든 모드입니다.
 
@@ -125,6 +127,22 @@ printf '%s' '{"doing":"통합 테스트 돌리는 중","todos":[{"text":"단위 
 
 > 작업 단계가 바뀔 때마다 `~/.claude/peer-status/<너의 sessionId>.json` 에 `{"doing": "...", "todos": [...]}` 를 다시 써 줘. 비밀값·실명은 넣지 말 것.
 
+## message-board: 세션 간 메시지 타임라인
+
+세션끼리 SendMessage 로 주고받은 메시지와 사용자가 각 세션에 입력한 프롬프트를 날짜별 한 타임라인으로 보여 줍니다(최신이 아래). 메시지를 주고받는 **세션마다** 이 모드를 켜 두면 각 세션이 `~/.claude/peer-status/messages/<날짜>/` 에 한 건씩 남기고, 보드가 5초마다 읽습니다. 본문은 앞 500자, 보관 7일. 명령: `/message-board`(패널) · `band` · `off` · `from <이름>` · `to <이름>` · `me` · `all` · `expand`. 자세한 것은 [message-board/README.md](message-board/README.md).
+
+```
+/plugin install message-board --marketplace kangisworking/billiboi-session-board
+```
+
+## notion-board: 노션 DB 현황표
+
+노션 데이터베이스(이슈 DB 등)를 프롬프트 위 표나 패널로 보여 주고 몇 분마다 다시 읽습니다. 노션 공식 API 의 조회만 부르는 읽기 전용이고, 토큰과 DB id 는 저장소 밖 `~/.claude/notion-board.json` 에 둡니다. 자세한 것은 [notion-board/README.md](notion-board/README.md).
+
+```
+/plugin install notion-board --marketplace kangisworking/billiboi-session-board
+```
+
 ## 한계
 
 - **대화 영역 위쪽에는 둘 수 없습니다.** 모드 API 가 플러그인에 주는 자리는 프롬프트 위 띠(AbovePrompt), 패널(Pane: 자리는 엔진이 정함), 프롬프트 아래 상태 줄뿐입니다.
@@ -144,6 +162,8 @@ printf '%s' '{"doing":"통합 테스트 돌리는 중","todos":[{"text":"단위 
 ```
 claude plugin validate session-board && claude plugin test session-board
 claude plugin validate peer-status-writer && claude plugin test peer-status-writer
+claude plugin validate message-board && claude plugin test message-board
+claude plugin validate notion-board && claude plugin test notion-board
 ```
 
 각 폴더의 `tsconfig.json` 은 모드가 한 번 로드될 때 Claude Code 가 `.claude-plugin/types/` 에 써 주는 타입 선언을 확장합니다(이 폴더는 생성물이라 저장소에 넣지 않습니다). 그 뒤 `tsc -p session-board` 로 타입 검사를 할 수 있습니다.

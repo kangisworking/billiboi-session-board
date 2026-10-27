@@ -1,8 +1,29 @@
 {
   "name": "billiboi-session-board",
-  "owner": { "name": "kangisworking" },
+  "owner": {
+    "name": "kangisworking"
+  },
   "plugins": [
-    { "name": "session-board", "source": "./session-board", "description": "Shows every Claude Code session on this machine (status, current task, todo progress) in a band above the prompt or a side pane. Read-only." },
-    { "name": "peer-status-writer", "source": "./peer-status-writer", "description": "Writes this session's TodoWrite/TaskCreate/TaskUpdate items to ~/.claude/peer-status/<sessionId>.json so session-board can show them." }
-  ]
+    {
+      "name": "session-board",
+      "source": "./session-board",
+      "description": "Shows every Claude Code session on this machine (status, current task, todo progress) in a band above the prompt or a side pane. Read-only."
+    },
+    {
+      "name": "peer-status-writer",
+      "source": "./peer-status-writer",
+      "description": "Writes this session's TodoWrite/TaskCreate/TaskUpdate items to ~/.claude/peer-status/<sessionId>.json so session-board can show them."
+    },
+    {
+      "name": "message-board",
+      "source": "./message-board",
+      "description": "Timeline of cross-session messages (sent, received, and the user's own prompts) across every session that has it on."
+    },
+    {
+      "name": "notion-board",
+      "source": "./notion-board",
+      "description": "Shows a Notion database (e.g. an issue tracker) as a table above the prompt or in a pane and refreshes it periodically. Read-only."
+    }
+  ],
+  "description": "Mods for working with several Claude Code sessions at once: a session board, a message timeline, and a status writer."
 }

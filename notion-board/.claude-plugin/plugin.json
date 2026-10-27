@@ -1,0 +1,10 @@
+{
+  "name": "notion-board",
+  "version": "0.1.0",
+  "description": "노션 이슈 DB 를 프롬프트 위 표·패널로 보여 주고 주기적으로 갱신한다(읽기 전용)",
+  "types": "./types/index.d.ts",
+  "license": "MIT",
+  "author": {
+    "name": "kangisworking"
+  }
+}
