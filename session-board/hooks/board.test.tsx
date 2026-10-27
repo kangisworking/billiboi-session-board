@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { colorFor, labelOf, ME_COLOR, PALETTE } from './label'
 import { fit, stringWidth } from './width'
 
 const PANE = {
@@ -17,10 +18,10 @@ const band = (bodyColumns: number, maxRows = 20) => ({
 
 const LONG = '문서를 고치고 테스트 결과를 모아서 다른 세션에 보고할 표를 만드는 중입니다 (아주 긴 설명 예시)'
 const ROW = {
-  id: 'abc', name: 'B · 리뷰어', alias: true, hasPeer: true, status: 'busy', kind: 'interactive', updatedAt: Date.now(), doing: LONG,
+  id: 'abc', name: 'B · 리뷰어', color: '#5fafff', alias: true, hasPeer: true, status: 'busy', kind: 'interactive', updatedAt: Date.now(), doing: LONG,
   todos: [{ text: '첫 묶음', done: true }, { text: '둘째 묶음', done: false, active: true }, { text: '셋째 묶음', done: false }],
 }
-const OLD = { id: 'old', name: '[old123] 옛 세션', alias: false, hasPeer: false, status: 'idle', kind: 'interactive', updatedAt: Date.now() - 3 * 3600_000, todos: [] }
+const OLD = { id: 'old', name: '[old123] 옛 세션', color: '#d787ff', alias: false, hasPeer: false, status: 'idle', kind: 'interactive', updatedAt: Date.now() - 3 * 3600_000, todos: [] }
 
 // 값마다 shape 를 붙여 state.get 에 답한다.
 const state = (values: Record<string, unknown>) => (_$: unknown, e: unknown) => {
@@ -74,8 +75,9 @@ for (const cols of [80, 160]) {
     // 이름 칸은 고정 폭(좁으면 16, 넓으면 22)이고 상태 칸은 5.
     const name = (await ui.find({ type: 'Text', text: /B · 리뷰어/ }))?.text ?? ''
     expect(stringWidth(name)).toBe((cols < 100 ? 16 : 22) + 1)
+    // 상태 칸은 아이콘(세션 색)과 따로 그린다: busy + 칸 채움 + 간격 1
     const status = (await ui.find({ type: 'Text', text: /busy/ }))?.text ?? ''
-    expect(stringWidth(status)).toBe(1 + 1 + 5 + 1)
+    expect(stringWidth(status)).toBe(5 + 1)
     // 하는 일은 남은 폭에서 한 줄로 자른다. 160열이면 다 들어간다.
     const doing = (await ui.find({ type: 'Text', text: /문서를 고치고/ }))?.text ?? ''
     if (cols < 100) expect(doing).toContain('…')
@@ -121,8 +123,8 @@ test('the band yields when the mode is pane', async ($, on) => {
 })
 
 const RECENT = [
-  { ts: new Date('2026-01-02T09:05:00').getTime(), from: '나', to: 'A · 조율', text: '리뷰 끝나면 알려 줘', isUser: true },
-  { ts: new Date('2026-01-02T09:06:00').getTime(), from: 'A · 조율', to: 'B · 리뷰어', text: '리뷰 부탁 ' + '아주 긴 본문 '.repeat(20), isUser: false },
+  { ts: new Date('2026-01-02T09:05:00').getTime(), from: '나', to: 'A · 조율', fromColor: 'claude', toColor: '#5fafff', text: '리뷰 끝나면 알려 줘', isUser: true },
+  { ts: new Date('2026-01-02T09:06:00').getTime(), from: 'A · 조율', to: 'B · 리뷰어', fromColor: '#5fafff', toColor: '#d787ff', text: '리뷰 부탁 ' + '아주 긴 본문 '.repeat(20), isUser: false },
 ]
 
 test('the band shows recent messages above the summary, one line each', async ($, on) => {
@@ -145,7 +147,7 @@ test('msgs off hides the recent messages block', async ($, on) => {
   await ui.unmount()
 })
 
-const MANY = Array.from({ length: 10 }, (_, i) => ({ ts: new Date('2026-01-02T09:00:00').getTime() + i * 60000, from: 'A · 조율', to: 'B · 리뷰어', text: `메시지 ${i + 1}`, isUser: false }))
+const MANY = Array.from({ length: 10 }, (_, i) => ({ ts: new Date('2026-01-02T09:00:00').getTime() + i * 60000, from: 'A · 조율', to: 'B · 리뷰어', fromColor: '#5fafff', toColor: '#d787ff', text: `메시지 ${i + 1}`, isUser: false }))
 
 test('a short band keeps the summary and the session table and trims messages first', async ($, on) => {
   on('state.get', state({ rows: [ROW], recent: MANY }))
@@ -165,4 +167,20 @@ test('a very short band drops the message block entirely', async ($, on) => {
   expect(await ui.find({ type: 'Text', text: /최근 메시지/ })).toBeUndefined()
   expect((await ui.find({ type: 'Text', text: /B · 리뷰어/ }))?.text).toContain('B · 리뷰어')
   await ui.unmount()
+})
+
+test('colorFor: me is fixed, colors.json wins, otherwise a stable palette color', async () => {
+  const n = {
+    byPid: new Map([['1111', 'aaaa1111-0000-0000-0000-000000000000'], ['2222', 'bbbb2222-0000-0000-0000-000000000000']]),
+    bySid: new Map([['aaaa1111-0000-0000-0000-000000000000', '조율 창'], ['bbbb2222-0000-0000-0000-000000000000', '테스트 창']]),
+    aliases: { aaaa11: 'A · 조율', '2222': 'C · 테스트' },
+    colors: { aaaa11: 'cyan' },
+  }
+  expect(colorFor(n, 'me')).toBe(ME_COLOR)
+  expect(colorFor(n, 'session:aaaa1111-0000-0000-0000-000000000000')).toBe('cyan')
+  expect(colorFor(n, 'uds:/tmp/cc-socks/1111.sock')).toBe('cyan')
+  const auto = colorFor(n, 'uds:/tmp/cc-socks/2222.sock')
+  expect(PALETTE.includes(auto)).toBe(true)
+  expect(colorFor(n, 'session:bbbb2222-0000-0000-0000-000000000000')).toBe(auto)
+  expect(labelOf(n, 'uds:/tmp/cc-socks/2222.sock')).toBe('C · 테스트')
 })

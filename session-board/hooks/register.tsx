@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
 import type { BoardMode, RecentMsg, Row, Todo } from '../types'
+import { colorOf, resolve } from './label'
 import { loadNames, readRecent } from './messages'
 import { fit, stringWidth } from './width'
 
@@ -25,7 +26,6 @@ const recent = atom({ plugin: 'session-board', key: 'recent' } as const, [], { s
 const RECENT_DEFAULT = 10
 const RECENT_MAX = 30
 const msgsN = atom({ plugin: 'session-board', key: 'msgsN' } as const, RECENT_DEFAULT, { shape: 'msgsN-1' })
-const MSG_PALETTE = ['claude', 'success', 'warning', 'suggestion', 'remember', 'planMode', 'autoAccept', 'ide', 'merged', 'permission']
 
 type Json = Record<string, unknown>
 type Session = { file: string; pid: number; sessionId: string; name: string; status: string; kind: string; updatedAt: number; jobId?: string }
@@ -119,6 +119,7 @@ async function collect($: any): Promise<Row[]> {
   }
 
   const alive = await alivePids($, sessions.map(s => s.pid))
+  const namesForColor = await loadNames($, base)
   const out: Row[] = []
   for (const s of sessions) {
     if (!alive.has(s.pid)) continue
@@ -155,6 +156,7 @@ async function collect($: any): Promise<Row[]> {
     out.push({
       id: s.sessionId,
       name: shown.replace(/\s+/g, ' ').slice(0, 60),
+      color: colorOf(namesForColor, { label: shown, sid: s.sessionId, pid: String(s.pid) }),
       alias: alias !== undefined,
       hasPeer: peer !== undefined,
       status: s.status,
@@ -256,8 +258,9 @@ function drawRows($: any, e: any, list: Row[], width: number, spin: string, todo
     return (
       <Box flexDirection="column">
         <Box>
-          <Text color={color} wrap="truncate">{fit(markOf(row, spin), c.icon)} {fit(row.status, c.status)} </Text>
-          <Text bold color={row.alias ? 'claude' : 'text'} wrap="truncate">{fit(row.name + (row.kind === 'bg' ? ' (bg)' : ''), c.name)} </Text>
+          <Text color={row.color} wrap="truncate">{fit(markOf(row, spin), c.icon)} </Text>
+          <Text color={color} wrap="truncate">{fit(row.status, c.status)} </Text>
+          <Text bold color={row.color} wrap="truncate">{fit(row.name + (row.kind === 'bg' ? ' (bg)' : ''), c.name)} </Text>
           <Text color={age.color} dimColor={age.dim} wrap="truncate">{fit(ago(row.updatedAt), c.age, 'right')} </Text>
           <Text color={done === row.todos.length && row.todos.length > 0 ? 'success' : 'subtle'} wrap="truncate">{fit(barText(done, row.todos.length, c.barCells), c.bar)} </Text>
           <Text wrap="truncate">{fit(row.doing ?? '', c.doing)}</Text>
@@ -273,12 +276,6 @@ function drawRows($: any, e: any, list: Row[], width: number, spin: string, todo
   return { Box, Text, line, header, body }
 }
 
-const hashOf = (s: string) => {
-  let h = 5381
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0
-  return h
-}
-const msgColor = (label: string) => (label === '나' ? 'text' : MSG_PALETTE[hashOf(label) % MSG_PALETTE.length])
 const hhmm = (ts: number) => {
   const d = new Date(ts)
   const p = (n: number) => String(n).padStart(2, '0')
@@ -294,9 +291,9 @@ function drawRecent($: any, e: any, list: RecentMsg[], width: number) {
     return (
       <Box>
         <Text dimColor wrap="truncate">{hhmm(m.ts)} </Text>
-        <Text color={msgColor(m.from)} wrap="truncate">● {m.from}</Text>
+        <Text color={m.fromColor} wrap="truncate">● {m.from}</Text>
         <Text dimColor wrap="truncate"> → </Text>
-        <Text color={msgColor(m.to)} wrap="truncate">● {m.to}</Text>
+        <Text color={m.toColor} wrap="truncate">● {m.to}</Text>
         {m.isUser ? <Text dimColor wrap="truncate"> (입력)</Text> : null}
         <Text wrap="truncate"> {fit(m.text, rest)}</Text>
       </Box>
@@ -319,7 +316,7 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'session-board',
-      description: '세션 현황: /session-board (프롬프트 위 띠), right (오른쪽 패널), all (숨긴 세션까지), msgs on|off|<n> (최근 메시지 칸, 기본 10건), off (숨김)',
+      description: '세션 현황: /session-board (프롬프트 위 띠), right (오른쪽 패널), all (숨긴 세션까지), msgs on|off|<n> (최근 메시지 칸), color <이름> <색> (세션 색), off (숨김)',
     })
     // 기본은 띠(band). 전에 패널 모드로 두었으면 그대로 다시 연다.
     const kept = await read($, mode)
@@ -366,6 +363,28 @@ export const register: Register = on => {
       if (!want) await update($, recent, () => [])
       await refresh($)
       return { text: want ? '띠·패널 맨 위에 최근 메시지를 보입니다.' : '최근 메시지 칸을 숨깁니다. /session-board msgs on 으로 다시 켭니다.' }
+    }
+    if (arg === 'color' || arg === 'colour') {
+      // /session-board color <이름|세션 id 접두|pid> <색>  → ~/.claude/peer-status/colors.json 에 저장(두 모드가 같이 읽음)
+      const parts = e.args.trim().split(/\s+/).slice(1)
+      const value = parts.pop() ?? ''
+      const who = parts.join(' ')
+      if (!who || !value) return { text: '쓰는 법: /session-board color <이름|세션 id 앞자리|pid> <색>. 색은 #5fafff 같은 hex 나 cyan 같은 이름.' }
+      const list = await read($, rows)
+      const hit = list.find(r => r.name === who || r.name.toLowerCase().includes(who.toLowerCase()) || r.id.toLowerCase().startsWith(who.toLowerCase()))
+      const key = hit ? hit.id.slice(0, 6) : who
+      const { stdout } = await $.process.run(['sh', '-c', 'printf %s "$HOME"'], { timeoutMs: 5000 })
+      const path = `${String(stdout).trim()}/.claude/peer-status/colors.json`
+      let current: Record<string, unknown> = {}
+      try {
+        current = JSON.parse(await $.fs.read(path))
+      } catch {
+        current = {}
+      }
+      current[key] = value
+      await $.fs.write(path, JSON.stringify(current, null, 2) + '\n')
+      await refresh($)
+      return { text: `${hit ? hit.name : who} 의 색을 ${value} 로 정했습니다(${path} 의 "${key}").` }
     }
     if (arg === 'all') {
       const now = !(await read($, showAll))

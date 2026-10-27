@@ -2,6 +2,7 @@ export type Todo = { text: string; done: boolean; active?: boolean }
 export type Row = {
   id: string
   name: string
+  color: string // 세션 고정 색(colors.json 또는 해시)
   alias: boolean // aliases.json 에 역할 이름이 있는 세션
   hasPeer: boolean // peer-status 파일을 스스로 쓰는 세션
   status: string
@@ -13,7 +14,7 @@ export type Row = {
 // band: 프롬프트 위 띠에 세션당 한 줄(기본). pane: 오른쪽(또는 inline) 패널 상세 보기. off: 안 보임.
 export type BoardMode = 'band' | 'pane' | 'off'
 // 띠·패널 맨 위에 보일 최근 메시지(message-board 파일에서 읽음)
-export type RecentMsg = { ts: number; from: string; to: string; text: string; isUser: boolean }
+export type RecentMsg = { ts: number; from: string; to: string; fromColor: string; toColor: string; text: string; isUser: boolean }
 
 declare module 'claude-code' {
   interface PluginState {

@@ -68,7 +68,7 @@ claude --plugin-dir ./billiboi-session-board/session-board --plugin-dir ./billib
 | 열 | 뜻 |
 |---|---|
 | 상태 | 아이콘 + `busy` / `idle` / `shell`. 아이콘: 점자 스피너(busy, 400ms 마다 돌아감) · `$`(shell 실행 중) · `-`(idle) · `x`(1시간 넘게 갱신 없음 또는 error) |
-| 세션 | `aliases.json` 의 역할 이름(강조색·굵게), 없으면 `[세션 id 앞 6자] 세션 이름`. 백그라운드 세션은 ` (bg)` |
+| 세션 | `aliases.json` 의 역할 이름, 없으면 `[세션 id 앞 6자] 세션 이름`. 백그라운드 세션은 ` (bg)`. 세션마다 고정 색 하나를 아이콘·이름·메시지 칸의 점에 같이 씀(`colors.json` 값이 우선, 없으면 sessionId 해시로 10색 팔레트) |
 | 갱신 | 마지막 활동 상대 시각. 5분 안은 밝게, 1시간 안은 옅게, 그 뒤는 흐리게 |
 | 진행 | todo 막대 `▰▰▱▱ 2/4`. 전부 끝나면 초록 |
 | 하는 일 | 세션이 남긴 한 줄(`doing`), 백그라운드 작업이면 그 요약 |
@@ -87,7 +87,8 @@ claude --plugin-dir ./billiboi-session-board/session-board --plugin-dir ./billib
 | `~/.claude/jobs/<jobId>/state.json` | 백그라운드 세션의 "하는 일" 한 줄(`detail`) |
 | `~/.claude/tasks/session-<sessionId 앞 8자>/*.json` | TaskCreate 가 남긴 항목(`subject`, `status`) |
 | `~/.claude/peer-status/<sessionId>.json` | 세션이 스스로 남긴 상태. 있으면 위 둘보다 먼저 씁니다 |
-| `~/.claude/peer-status/aliases.json` | 세션 id(앞 4자 이상) 또는 pid → 역할 이름 |
+| `~/.claude/peer-status/aliases.json` | 세션 id(앞 4자 이상) 또는 pid → 역할 이름. `"colors"` 칸에 색도 둘 수 있음 |
+| `~/.claude/peer-status/colors.json` | 세션 id 앞부분·pid·이름 → 색. `/session-board color` 가 씀 |
 
 `peer-status/<sessionId>.json` 의 형식:
 
@@ -153,7 +154,7 @@ printf '%s' '{"doing":"통합 테스트 돌리는 중","todos":[{"text":"단위 
 
 ## 보안
 
-- `session-board` 는 위 표의 JSON 파일을 읽고 `ps` 로 pid 생존만 확인합니다. 아무것도 쓰지 않습니다.
+- `session-board` 는 위 표의 JSON 파일을 읽고 `ps` 로 pid 생존만 확인합니다. 쓰는 파일은 `/session-board color` 를 쳤을 때의 `colors.json` 하나뿐입니다.
 - `peer-status-writer` 는 `~/.claude/peer-status/` 아래 자기 세션 파일 하나만 씁니다.
 - 둘 다 세션 대화 기록(jsonl)은 읽지 않습니다. 화면에는 세션 이름, "하는 일" 한 줄, todo 제목만 나오니 거기에 비밀값이나 실명을 적지 않도록 합니다.
 - 켜기 전에 `claude plugin validate <폴더>` 로 무엇을 읽고 부르는지 확인할 수 있습니다.

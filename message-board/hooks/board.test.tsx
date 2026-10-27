@@ -149,6 +149,7 @@ test('labelOf resolves me, session ids, sockets, truncated ListAgents names and 
     byPid: new Map([['1111', 'aaaa1111-0000-0000-0000-000000000000'], ['2222', 'bbbb2222-0000-0000-0000-000000000000']]),
     bySid: new Map([['aaaa1111-0000-0000-0000-000000000000', '조율 창'], ['bbbb2222-0000-0000-0000-000000000000', '테스트 창']]),
     aliases: { aaaa11: 'A · 조율', '2222': 'C · 테스트' },
+    colors: {},
   }
   expect(labelOf(n, 'me')).toBe('나')
   expect(labelOf(n, 'session:aaaa1111-0000-0000-0000-000000000000')).toBe('A · 조율')

@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
 import type { BoardMode, Filter, Msg } from '../types'
-import { labelOf, type Names } from './label'
+import { colorOf, resolve, type Names } from './label'
 import { fit, stringWidth } from './width'
 
 // 두 가지 일을 한다.
@@ -16,7 +16,6 @@ const KEEP_DAYS = 7
 const MAX_SHOWN = 200
 const TEXT_MAX = 500
 const BAND_ITEMS = 5
-const PALETTE = ['claude', 'success', 'warning', 'suggestion', 'remember', 'planMode', 'autoAccept', 'ide', 'merged', 'permission']
 
 const msgs = atom({ plugin: 'message-board', key: 'msgs' } as const, [], { shape: 'msgs-1' })
 const filter = atom({ plugin: 'message-board', key: 'filter' } as const, { kind: 'all' }, { shape: 'filter-1' })
@@ -55,11 +54,6 @@ const hhmm = (ts: number) => {
   const d = new Date(ts)
   const p = (n: number) => String(n).padStart(2, '0')
   return `${p(d.getHours())}:${p(d.getMinutes())}`
-}
-const hash = (s: string) => {
-  let h = 5381
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0
-  return h
 }
 
 // ---- 기록 ----
@@ -114,9 +108,14 @@ async function names($: any, base: string): Promise<Names> {
   const raw = (await readJson($, `${base}/peer-status/aliases.json`)) ?? {}
   const aliases: Record<string, string> = {}
   for (const [k, v] of Object.entries(raw)) if (typeof v === 'string' && v) aliases[k] = v
-  return { byPid, bySid, aliases }
+  // 색: colors.json 이 우선, aliases.json 의 "colors" 칸도 받는다(session-board 와 같은 규칙).
+  const colors: Record<string, string> = {}
+  const inAliases = raw.colors
+  if (inAliases && typeof inAliases === 'object') for (const [k, v] of Object.entries(inAliases as Json)) if (typeof v === 'string' && v) colors[k] = v
+  const own = (await readJson($, `${base}/peer-status/colors.json`)) ?? {}
+  for (const [k, v] of Object.entries(own)) if (typeof v === 'string' && v) colors[k] = v
+  return { byPid, bySid, aliases, colors }
 }
-const colorOf = (label: string) => (label === '나' ? 'text' : PALETTE[hash(label) % PALETTE.length])
 
 async function collect($: any): Promise<Msg[]> {
   const base = `${await home($)}/.claude`
@@ -132,12 +131,16 @@ async function collect($: any): Promise<Msg[]> {
       if (entry.kind !== 'file' || !entry.name.endsWith('.json')) continue
       const v = await readJson($, `${base}/peer-status/messages/${day}/${entry.name}`)
       if (!v || typeof v.text !== 'string') continue
+      const rf = resolve(n, str(v.from))
+      const rt = resolve(n, str(v.to))
       out.push({
         id: str(v.id, entry.name),
         ts: num(v.ts),
         dir: v.dir === 'out' || v.dir === 'in' || v.dir === 'user' ? v.dir : 'in',
-        from: labelOf(n, str(v.from)),
-        to: labelOf(n, str(v.to)),
+        from: rf.label,
+        to: rt.label,
+        fromColor: colorOf(n, rf),
+        toColor: colorOf(n, rt),
         text: str(v.text),
       })
     }
@@ -216,11 +219,11 @@ function drawList($: any, e: any, list: Msg[], width: number, isExpanded: boolea
       <Box flexDirection="column">
         <Box>
           <Text dimColor wrap="truncate">{hhmm(m.ts)} </Text>
-          <Text color={colorOf(m.from)} wrap="truncate">● </Text>
-          <Text bold={m.from === '나'} color={colorOf(m.from)} wrap="truncate">{fit(m.from, Math.min(stringWidth(m.from), Math.max(4, Math.floor((width - 12) / 2))))}</Text>
+          <Text color={m.fromColor ?? 'text'} wrap="truncate">● </Text>
+          <Text bold={m.from === '나'} color={m.fromColor ?? 'text'} wrap="truncate">{fit(m.from, Math.min(stringWidth(m.from), Math.max(4, Math.floor((width - 12) / 2))))}</Text>
           <Text dimColor wrap="truncate"> → </Text>
-          <Text color={colorOf(m.to)} wrap="truncate">● </Text>
-          <Text color={colorOf(m.to)} wrap="truncate">{fit(m.to, Math.min(stringWidth(m.to), Math.max(4, Math.floor((width - 12) / 2))))}</Text>
+          <Text color={m.toColor ?? 'text'} wrap="truncate">● </Text>
+          <Text color={m.toColor ?? 'text'} wrap="truncate">{fit(m.to, Math.min(stringWidth(m.to), Math.max(4, Math.floor((width - 12) / 2))))}</Text>
           {m.dir === 'user' ? <Text dimColor wrap="truncate"> (입력)</Text> : null}
         </Box>
         {body.map(line => (

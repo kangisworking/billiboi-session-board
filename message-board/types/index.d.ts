@@ -5,6 +5,8 @@ export type Msg = {
   dir: 'out' | 'in' | 'user' // out: 이 세션이 보냄, in: 이 세션이 받음, user: 사용자가 이 세션에 입력
   from: string // 'me' | 'session:<sessionId>' | 받은 메시지의 from 주소(uds:... 등) | 이름
   to: string // 'session:<sessionId>' | 보낼 때 적은 주소·이름
+  fromColor?: string // 표시용(읽을 때 채움)
+  toColor?: string
   text: string // 앞 500자
 }
 export type Filter = { kind: 'all' | 'me' | 'from' | 'to'; name?: string }
