@@ -59,6 +59,8 @@ claude --plugin-dir ./billiboi-session-board/session-board --plugin-dir ./billib
 | `/session-board` | 프롬프트 바로 위 띠에 표로 보이기(기본) |
 | `/session-board right` (`pane`, `dock` 도 됨) | 패널로 보기. 전체화면(터미널 110열 이상)이면 오른쪽에 붙고, 아니면 프롬프트 위 inline. 띠는 꺼짐 |
 | `/session-board all` | 오래 멈춘 이름 없는 세션까지 보이기(토글) |
+| `/session-board msgs on\|off\|<n>` | 띠·패널 맨 위의 최근 메시지 칸(message-board 가 남긴 파일) 켜고 끄기, 또는 건수 1~30(기본 10). 띠가 낮으면 머리줄·세션 표를 지키고 메시지부터 줄임 |
+| `/session-board color <이름\|세션 id 앞자리\|pid> <색>` | 그 세션의 고정 색을 `~/.claude/peer-status/colors.json` 에 적음(message-board 도 같이 씀) |
 | `/session-board off` | 숨기기 |
 
 고른 모드는 세션 상태에 남아 모드를 다시 읽어도 유지됩니다. 띠는 `ctrl+x ctrl+a` 로 접을 수 있고, AskUserQuestion 같은 설문이 그 자리를 쓰는 동안은 비켜 줍니다.
